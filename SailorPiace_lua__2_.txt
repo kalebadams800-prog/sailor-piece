@@ -9476,7 +9476,7 @@ do -- Library
                 Logo = Data.Logo or Data.logo or "135215559087473",
                 FadeSpeed = Data.FadeSpeed or Data.fadespeed or 0.2,
                 Version = Data.Version or Data.version or "v1.0.0 alpha",
-                Size = not IsMobile and UDim2New(0, 659, 0, 511) or UDim2New(0, 380, 0, 420),
+                Size = not IsMobile and UDim2New(0, 620, 0, 470) or UDim2New(0, 340, 0, 400),
 
                 Pages = { },
                 SubPages = { },
@@ -12379,266 +12379,7 @@ do
         MainFrame = Window.Items["MainFrame"] -- keep this
     })
 
-    local ChatSystem = Library:ChatSystem({
-        MainFrame = Window.Items["MainFrame"] -- keep this
-    })
-
-    local Chat_API = {}
-
-    Chat_API.URL = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/"
-
-    local HttpService = Services.HttpService
-
-    function Chat_API.SendMessage(UserId, Message)
-        local Response = game:HttpGet(string.format(
-            "%s?format=json&event=chat&message=%s&userid=%s",
-            Chat_API.URL,
-            HttpService:UrlEncode(Message),
-            HttpService:UrlEncode(UserId)
-        ))
-
-        return HttpService:JSONDecode(Response)
-    end
-
-    function Chat_API.Heartbeat(UserId)
-        local Response = game:HttpGet(string.format(
-            "%s?format=json&event=heartbeat&userid=%s",
-            Chat_API.URL,
-            HttpService:UrlEncode(UserId)
-        ))
-        return HttpService:JSONDecode(Response)
-    end
-
-    function Chat_API.GetMessages()
-        local Response = game:HttpGet(Chat_API.URL.."?format=json")
-
-        return HttpService:JSONDecode(Response)
-    end
-
-    local Cached_Data = {}
-
-    local Special_DiscordIDS = {
-        ["1096603799159832636"] = ' - <font color="#EC1717">Owner</font>'
-    }
-    
-if not isfolder("wave/Assets/Profiles") then
-            makefolder("wave/Assets/Profiles")
-    end
-
-    function Chat_API.GetDiscordProfile(Discord_ID)
-        if not Cached_Data[Discord_ID] then
-            local Response = game:HttpGet("https://discord-lookup-api-neon.vercel.app/v1/user/" .. Discord_ID)
-            repeat wait() until Response
-            task.wait(0.1)
-            Cached_Data[Discord_ID] = HttpService:JSONDecode(Response)
-        end
-            
-        local avatar = Cached_Data[Discord_ID].avatar
-        local ext = avatar.is_animated and ".gif" or ".png"
-
-        if not isfile("wave/Assets/Profiles/"..Discord_ID..ext) then
-            if not avatar.link then
-                writefile("wave/Assets/Profiles/"..Discord_ID..ext, game:HttpGet('https://raw.githubusercontent.com/ValarySoftworks/Assets/refs/heads/main/download.png'))
-            else
-                writefile("wave/Assets/Profiles/"..Discord_ID..ext, game:HttpGet(avatar.link))
-            end
-        end
-
-        local Name = Cached_Data[Discord_ID].global_name
-
-        if Special_DiscordIDS[Discord_ID] then
-            Name..=Special_DiscordIDS[Discord_ID]
-        end
-
-        return getcustomasset("valary/Assets/Profiles/"..Discord_ID..ext), Name
-    end
-
-    task.spawn(function()
-        do -- Add User
-            pcall(function()
-                local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
-                local base64_name = string.reverse(base64.encode(LocalPlayer.Name))
-
-                local encodedName = HttpService:UrlEncode(base64_name)
-
-                request({
-                    Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=add_user&userid=" 
-                        .. encodedID .. "&username=" .. encodedName,
-                    Method = "GET"
-                })
-            end)
-        end
-
-        -- Refresh hearbeat
-            task.spawn(LPH_JIT_MAX(function()
-                while task.wait(90) do
-                    pcall(Chat_API.Heartbeat, LRM_LinkedDiscordID)
-                    --local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
-                    --request({Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=heartbeat&userid="..encodedID, Method = "GET"})
-                end
-            end))
-        --
-
-        -- Refresh Status
-            do
-                pcall(function()
-                    local Users = Chat_API.GetMessages().users.value
-
-                    ChatSystem:SetStatusText(string.format('%s Active | Connected', tostring(Users)))
-                end)
-            end
-        --
-            
-        ChatSystem:OnMessageSendPressed(function()
-            local Profile, Username = Chat_API.GetDiscordProfile(LRM_LinkedDiscordID)
-
-            local Text = ChatSystem:GetTypedMessage()
-
-            ChatSystem:ClearText()
-            
-            ChatSystem:SendMessage(Profile, Username, Text, true)
-
-            pcall(Chat_API.SendMessage, LRM_LinkedDiscordID, Text)
-        end)
-
-        task.spawn(LPH_JIT_MAX(function()
-            local data_to_send = {}
-            local Already_Sent = {}
-
-            --[[pcall(function()
-                for i,v in Chat_API.GetMessages().messages do
-                    if not Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] then
-                        Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] = true
-                    end
-                end
-            end)]]
-
-            local function formatNameWithTime(username, time)
-                return string.format(
-                    '%s <font color="#72767D"> %s</font>',
-                    username,
-                    os.date("%H:%M", time)
-                )
-            end
-
-            while task.wait(1) do
-                local Success, Error = pcall(function()
-                    local Messages = Chat_API.GetMessages()
-
-                    ChatSystem:SetStatusText(string.format('%s Active | Connected', tostring(Messages.users.value)))
-
-                    if not Messages.users.stored[LRM_LinkedDiscordID] then
-                        local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
-                        local base64_name = string.reverse(base64.encode(LocalPlayer.Name))
-
-                        local encodedName = HttpService:UrlEncode(base64_name)
-
-                        request({
-                            Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=add_user&userid=" 
-                                .. encodedID .. "&username=" .. encodedName,
-                            Method = "GET"
-                        })
-                    end
-
-                    for i,v in Messages.users.stored do
-                        pcall(function()
-                            local decoded_user = base64.decode(string.reverse(v.username))
-
-                            if not Config.Wave_Users[decoded_user] then
-                                Config.Wave_Users[decoded_user] = i
-                            end
-                        end)
-                    end
-
-                    local toRemove = {}
-
-                    for username, id in Config.Valary_Users do
-                        if not Messages.users.stored[id] then
-                            table.insert(toRemove, username)
-                        end
-                    end
-
-                    for _, username in toRemove do
-                        Config.Wave_Users[username] = nil
-                    end
-
-                    for _, v in pairs(Messages.messages) do
-                        --if v.userid ~= LRM_LinkedDiscordID then
-                            if not Already_Sent[v.userid.."_"..v.timestamp.."_"..v.message] then
-                                local Profile, Username = Chat_API.GetDiscordProfile(v.userid)
-
-                                Username = tostring(Username or "Unknown")
-                                local Timestamp = tonumber(v.timestamp) or os.time()
-
-                                data_to_send[v.userid] = data_to_send[v.userid] or {}
-
-                                table.insert(data_to_send[v.userid], {
-                                    UserId = v.userid,
-                                    Profile = Profile,
-                                    Username = Username,
-                                    Message = tostring(v.message or "ERROR"),
-                                    Timestamp = Timestamp
-                                })
-                            end
-                        --end
-                    end
-
-                    local flat = {}
-
-                    for _, msgs in pairs(data_to_send) do
-                        for _, msg in ipairs(msgs) do
-                            table.insert(flat, msg)
-                        end
-                    end
-
-                    table.sort(flat, function(a, b)
-                        return a.Timestamp < b.Timestamp
-                    end)
-
-                    for _, v in ipairs(flat) do
-                        local msgKey = v.UserId .. "_" .. v.Timestamp .. "_" .. v.Message
-
-                        local Check = v.UserId ~= LRM_LinkedDiscordID
-
-                        if not dfihjdsiufodsaiuojdfdsjauidfsdad then
-                            Check = true
-                        end
-
-                        if not Already_Sent[msgKey] and Check then
-                            ChatSystem:SendMessage(
-                                v.Profile,
-                                formatNameWithTime(v.Username, v.Timestamp),
-                                v.Message,
-                                v.UserId == LRM_LinkedDiscordID
-                            )
-
-                            Already_Sent[msgKey] = true
-                        end
-                    end
-
-                    table.clear(data_to_send)
-
-                    --[[for i,v in Messages.messages do
-                        if v.userid ~= LRM_LinkedDiscordID and not Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] then
-                            local Profile, Username = Chat_API.GetDiscordProfile(v.userid)
-
-                            ChatSystem:SendMessage(Profile, formatNameWithTime(Username, v.timestamp), v.message, false)
-                            Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] = true
-                        end
-                    end]]
-
-                    if not dfihjdsiufodsaiuojdfdsjauidfsdad then
-                        getgenv().SendMessage_Input.Instance.PlaceholderText = "Send message"
-                        dfihjdsiufodsaiuojdfdsjauidfsdad = true
-                    end
-                end)
-
-                if not Success then
-                    warn("GLOBAL CHAT ERROR :",Error)
-                end
-            end
-        end))
-    end)
+    -- Global chat feature removed.
 
     Watermark = Library:Watermark("This is a watermark", "135215559087473")
     Watermark:SetVisibility(false)
@@ -14474,8 +14215,6 @@ if not isfolder("wave/Assets/Profiles") then
                         local Found, Cup = GetFruitCup()
 
                         if Cup and Found then
-                            Config:HideScreen("generating illegal cash 💷\n please wait.")
-
                             local OLDCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
 
                             if Cup.Parent == LocalPlayer.Backpack then
@@ -14497,8 +14236,6 @@ if not isfolder("wave/Assets/Profiles") then
 
                             return
                         end
-
-                        Config:HideScreen("buying products 🍉\nif you are stuck here, PLEASE WAIT!!")
 
                         local OLDCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
 
@@ -14541,8 +14278,6 @@ if not isfolder("wave/Assets/Profiles") then
                             })
                             return
                         end
-
-                        Config:SetText("generating illegal cash 💷\n this takes around 1-2 minutes.\n please wait.")
 
                         Config:Teleport(Stove.CookPart.CFrame)
 

